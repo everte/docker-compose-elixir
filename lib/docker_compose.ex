@@ -39,6 +39,14 @@ defmodule DockerCompose do
     |> result()
   end
 
+  def version(opts) do
+    args = [compose_opts(opts), "version"] |> List.flatten()
+
+    args
+    |> execute(opts)
+    |> result()
+  end
+
   @doc """
   docker-compose down
 
@@ -155,8 +163,71 @@ defmodule DockerCompose do
     |> result()
   end
 
+  @spec pull(Keyword.t()) :: {:ok, output} | {:error, exit_code, output}
+  def pull(opts) do
+    args =
+      [
+        compose_opts(opts),
+        "pull",
+        service_opts(opts)
+      ]
+      |> List.flatten()
+
+    args
+    |> execute(opts)
+    |> result()
+  end
+
+  @spec ps(Keyword.t()) :: {:ok, output} | {:error, exit_code, output}
+  def ps(opts) do
+    args =
+      [
+        compose_opts(opts),
+        "ps",
+        ps_opts(opts)
+      ]
+      |> List.flatten()
+
+    args
+    |> execute(opts)
+    |> result()
+  end
+
+  @spec logs(Keyword.t()) :: {:ok, output} | {:error, exit_code, output}
+  def logs(opts) do
+    args =
+      [
+        compose_opts(opts),
+        "logs",
+        service_opts(opts)
+      ]
+      |> List.flatten()
+
+    args
+    |> execute(opts)
+    |> result()
+  end
+
+  def command_name(command, opts) do
+    args =
+      [
+        compose_opts(opts),
+        command,
+        service_opts(opts)
+      ]
+      |> List.flatten()
+
+    args
+    |> execute(opts)
+    |> result()
+  end
+
   defp execute(args, opts) do
+    # IO.inspect(args)
+    # IO.inspect(opts)
+
     System.cmd(get_executable(), wrapper_opts(opts) ++ ["--ansi", "never"] ++ args, [
+      # |> IO.inspect()
       {:stderr_to_stdout, true} | cmd_opts(opts)
     ])
   end
@@ -195,11 +266,20 @@ defmodule DockerCompose do
     |> command_opts()
   end
 
+  def ps_opts(opts) do
+    opts
+    |> Keyword.take([:format])
+    |> command_opts()
+  end
+
   defp command_opts([{:force_recreate, true} | rest]),
     do: ["--force-recreate" | command_opts(rest)]
 
   defp command_opts([{:remove_orphans, true} | rest]),
     do: ["--remove-orphans" | command_opts(rest)]
+
+  defp command_opts([{:format, "json"} | rest]),
+    do: [["--format", "json"] ++ command_opts(rest)]
 
   defp command_opts([_ | rest]), do: command_opts(rest)
   defp command_opts([]), do: []
@@ -210,6 +290,10 @@ defmodule DockerCompose do
 
   defp cmd_opts([{:compose_path, path} | rest]) do
     [{:cd, Path.dirname(path)} | cmd_opts(rest)]
+  end
+
+  defp cmd_opts([{:env, vars} | rest]) do
+    [{:env, vars} | cmd_opts(rest)]
   end
 
   defp cmd_opts([{:into, _collectable} = into | rest]) do
